@@ -100,6 +100,8 @@ if(is_plugin_active('json-rest-api/plugin.php')){
             $comment_id = wp_new_comment( $commentdata );
             
             if (intval($comment_id) > 0){
+                //action hook on adding of a comment
+                do_action('aj_comments_comment_added',$comment_id,$commentdata);                
                 wp_send_json_success(array('comment_id'=>$comment_id));   
             }else{
                 wp_send_json_error(array('msg' => 'error posting comment'));
@@ -238,6 +240,7 @@ if(is_plugin_active('json-rest-api/plugin.php')){
             $response['comments'] = $comments;
             
             $args['count'] = true;
+            $args['offset'] = 0;
             $comment_count =  get_comments($args); 
             $response['count'] = $comment_count;
                
@@ -307,6 +310,7 @@ if(is_plugin_active('json-rest-api/plugin.php')){
             $response['comments'] = $comments;
             
             $args['count'] = true;
+            $args['offset'] = 0;
             $comment_count =  get_comments($args); 
             $response['count'] = $comment_count;
             
