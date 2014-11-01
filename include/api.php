@@ -137,6 +137,8 @@ if(is_plugin_active('json-rest-api/plugin.php')){
             $update_flag = wp_update_comment($commentarr);
             
             if($update_flag > 0){
+                //action hook on editing a comment
+                do_action('aj_comments_comment_edited',$comment_id);          
                 wp_send_json_success(array('msg' => 'Updated.','content' =>$commentarr['comment_content']));
             }else{
                 wp_send_json_error(array('msg' => 'Error Updating.')); 
