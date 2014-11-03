@@ -28,7 +28,7 @@ if(is_plugin_active('json-rest-api/plugin.php')){
         /*Register Routes*/
         public function register_routes( $routes ) {
 
-             $routes['/aj_comments/comments/add'] = array(
+             $routes['/aj_comments/comments'] = array(
                 array( array( $this, 'add_comment'), WP_JSON_Server::CREATABLE | WP_JSON_Server::ACCEPT_JSON),
                 );
              
@@ -61,7 +61,7 @@ if(is_plugin_active('json-rest-api/plugin.php')){
             
             // check if custom comment type registered
             if(! $aj_commentsmodule->is_registered_comment_type($data['comment_type'])){
-                wp_send_json_error(array('msg' => 'comment type not registered'));
+                return new WP_Error( 'json_comment_not_added', __( 'comment type not registered.' ), array( 'status' => 401 ) );
             }
             
             $comment_post_ID = (isset($data['comment_post_ID'])) ? (int) $data['comment_post_ID'] : 0;
@@ -101,10 +101,12 @@ if(is_plugin_active('json-rest-api/plugin.php')){
             
             if (intval($comment_id) > 0){
                 //action hook on adding of a comment
-                do_action('aj_comments_comment_added',$comment_id,$commentdata);                
-                wp_send_json_success(array('comment_id'=>$comment_id));   
+                do_action('aj_comments_comment_added',$comment_id,$commentdata);  
+                $response = new WP_JSON_Response();
+                $response->set_data( array('comment_id'=>$comment_id) );
+                return $response;  
             }else{
-                wp_send_json_error(array('msg' => 'error posting comment'));
+                return new WP_Error( 'json_error_posting_comment', __( 'Error posting comment' ), array( 'status' => 400 ) );
             }
 
         }
@@ -123,7 +125,7 @@ if(is_plugin_active('json-rest-api/plugin.php')){
             
             $comment_data = get_comment($comment_id);
             if(is_null($comment_data)){
-                wp_send_json_error(array('msg' => 'Invalid Comment id'));
+                return new WP_Error( 'json_comment_invalid_id', __( 'Invalid Comment Id.' ), array( 'status' => 404 ) );                
             }
             
             /*if ( ! current_user_can( 'edit_comment', (int) $comment_id ) ){
@@ -138,10 +140,11 @@ if(is_plugin_active('json-rest-api/plugin.php')){
             
             if($update_flag > 0){
                 //action hook on editing a comment
-                do_action('aj_comments_comment_edited',$comment_id);          
-                wp_send_json_success(array('msg' => 'Updated.','content' =>$commentarr['comment_content']));
+                do_action('aj_comments_comment_edited',$comment_id);  
+                $response = new WP_JSON_Response(array('msg' => 'Updated.','content' =>$commentarr['comment_content']));
+                return $response;
             }else{
-                wp_send_json_error(array('msg' => 'Error Updating.')); 
+                return new WP_Error( 'json_error_updating_comment', __( 'Error Updating comment' ), array( 'status' => 400 ) );
             }
           
         }
@@ -152,12 +155,11 @@ if(is_plugin_active('json-rest-api/plugin.php')){
          * @param bool true|false permanantly delete post 
          * 
          */
-        public function delete_comment($comment_id,$force = false ){
+        public function delete_comment($comment_id,$force = false){
  		$comment_array = get_comment( $comment_id, ARRAY_A );
 
 		if ( empty( $comment_array ) ) {
-			$resp = new WP_Error( 'json_comment_invalid_id', __( 'Invalid comment ID.' ), array( 'status' => 404 ) );
-                        wp_send_json_error(array('msg'=>$resp->get_error_message()));
+                        return new WP_Error( 'json_comment_invalid_id', __( 'Invalid Comment ID.' ), array( 'status' => 404 ) );      
 		}
 
 		/*if ( ! current_user_can(  'edit_comment', $comment_array['comment_ID'] ) ) {
@@ -165,17 +167,23 @@ if(is_plugin_active('json-rest-api/plugin.php')){
                         wp_send_json_error(array('msg'=>$resp->get_error_message()));
 		}*/
 
+                $force = false;
+                if(isset($data['force']) && $data['force'] == 1){
+                    $force = true;
+                }
+                
 		$result = wp_delete_comment( $comment_array['comment_ID'], $force );
 
 		if ( ! $result ) {
-			$resp = new WP_Error( 'json_cannot_delete', __( 'The comment cannot be deleted.' ), array( 'status' => 500 ) );
-                        wp_send_json_error(array('msg'=>$resp->get_error_message()));
+			return  new WP_Error( 'json_cannot_delete', __( 'The comment cannot be deleted.' ), array( 'status' => 500 ) );
 		}
 
 		if ( $force ) {
-                    wp_send_json_success(array('msg'=>'Permanently deleted comment'));
+                    $response = new WP_JSON_Response(array('msg' => 'Permanently deleted comment'));
+                    return $response;                    
 		} else {
-                    wp_send_json_success(array('msg'=>'Deleted comment'));
+                    $response = new WP_JSON_Response(array('msg' => 'Deleted comment'));
+                    return $response;                    
 		}           
         }
         
@@ -193,7 +201,7 @@ if(is_plugin_active('json-rest-api/plugin.php')){
             
             // check if custom comment type obj is registered
             if(! $aj_commentsmodule->is_registered_comment_type($comment_type)){
-                wp_send_json_error(array('msg' => 'comment type not registered'));
+                return new WP_Error( 'json_comment_type_invalid', __( 'comment type not registered' ), array( 'status' => 401 ) );
             }
             
             // set the limit and offset to get the records
@@ -246,8 +254,11 @@ if(is_plugin_active('json-rest-api/plugin.php')){
             $comment_count =  get_comments($args); 
             $response['count'] = $comment_count;
                
-            header('X-Total-Count: '.$comment_count);
-            wp_send_json_success($response);
+            $resp= new WP_JSON_Response();
+            $resp->header( 'X-Total-Count', $comment_count );
+            $resp->set_data( $response );
+            return $resp; 
+            
         }
         
         /*
@@ -316,8 +327,10 @@ if(is_plugin_active('json-rest-api/plugin.php')){
             $comment_count =  get_comments($args); 
             $response['count'] = $comment_count;
             
-            header('X-Total-Count: '.$comment_count);
-            wp_send_json_success($response);            
+            $resp= new WP_JSON_Response();
+            $resp->header( 'X-Total-Count', $comment_count );
+            $resp->set_data( $response );
+            return $resp;      
         }
         
     }
