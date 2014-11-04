@@ -35,6 +35,7 @@ if(is_plugin_active('json-rest-api/plugin.php')){
              $routes['/aj_comments/comments/(?P<comment_id>\d+)'] = array(
                 array( array( $this, 'edit_comment' ),      WP_JSON_Server::EDITABLE | WP_JSON_Server::ACCEPT_JSON ),
                 array( array( $this, 'delete_comment' ),    WP_JSON_Server::DELETABLE ),
+                array( array( $this, 'get_comment' ),    WP_JSON_Server::READABLE ),
                 );
              
              $routes['/aj_comments/comments/(?P<comment_obj_id>\d+)/type/(?P<comment_type>\w+)'] = array(
@@ -175,7 +176,7 @@ if(is_plugin_active('json-rest-api/plugin.php')){
 		$result = wp_delete_comment( $comment_array['comment_ID'], $force );
 
 		if ( ! $result ) {
-			return  new WP_Error( 'json_cannot_delete', __( 'The comment cannot be deleted.' ), array( 'status' => 500 ) );
+			return  new WP_Error( 'json_cannot_delete', __( 'The comment cannot be deleted.' ), array( 'status' => 400 ) );
 		}
 
 		if ( $force ) {
@@ -185,6 +186,23 @@ if(is_plugin_active('json-rest-api/plugin.php')){
                     $response = new WP_JSON_Response(array('msg' => 'Deleted comment'));
                     return $response;                    
 		}           
+        }
+ 
+        /*
+         * function to get a comment
+         * @param int $comment_id
+         * 
+         */
+        public function get_comment($comment_id){
+            $comment_id = intval($comment_id);
+            $comment_array = get_comment( $comment_id, ARRAY_A );
+            
+            if(is_null($comment_array)){
+                return new WP_Error( 'json_comment_invalid_id', __( 'Invalid Comment Id.' ), array( 'status' => 404 ) );                
+            }else{
+                $response = new WP_JSON_Response(array($comment_array));
+                return $response;                 
+            }
         }
         
         /*
